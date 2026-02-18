@@ -1,7 +1,7 @@
 import os
 from dotenv import load_dotenv
 from prompts import system_prompt
-from call_function import available_functions
+from call_function import available_functions, call_function
 import argparse
 from google.genai import types
 from google import genai
@@ -9,7 +9,7 @@ parser = argparse.ArgumentParser(description="Chatbot")
 parser.add_argument("user_prompt", type=str, help="User prompt")
 parser.add_argument("--verbose", action="store_true", help="Enable verbose output")
 args = parser.parse_args()
-# Now we can access `args.user_prompt`
+
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -30,10 +30,20 @@ def main():
         print(f"User prompt: {messages}")
         print(f"Prompt tokens: {response.usage_metadata.prompt_token_count}")
         print(f"Response tokens: {response.usage_metadata.candidates_token_count}")
-
+    response_list = []
     if response.function_calls != None:
         for function_call in response.function_calls:
-            print(f"Calling function: {function_call.name}({function_call.args})")
+            function_call_result = call_function(function_call, args.verbose)
+            if function_call_result.parts == []:
+                raise Exception("Error: function parts are empty")
+            if function_call_result.parts[0].function_response == None:
+                raise Exception("Error: function response of first function part is None")
+            if function_call_result.parts[0].function_response.response == None:
+                raise Exception("Error: response of function response is None")
+            response_list.append(function_call_result.parts[0])
+            if args.verbose == True:
+                print(f"-> {function_call_result.parts[0].function_response.response}")
+            
     else:
         print(response.text)
     
